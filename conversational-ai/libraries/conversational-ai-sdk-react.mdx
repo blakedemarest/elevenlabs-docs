@@ -4,7 +4,10 @@ description: "Conversational AI SDK: deploy customized, interactive voice agents
 icon: "react"
 ---
 
-<Info>Also see the [Conversational AI overview](/product/conversational-ai/overview)</Info>
+<Info>
+  Also see the [Conversational AI
+  overview](/conversational-ai/docs/introduction)
+</Info>
 
 ## Installation
 
@@ -33,7 +36,7 @@ const conversation = useConversation();
 ```
 
 Note that Conversational AI requires microphone access.
-Consider explaining and allowing access in your apps UI before the Conversation kicks off. 
+Consider explaining and allowing access in your apps UI before the Conversation kicks off.
 
 ```js
 // call after explaning to the user why the microphone access is needed
@@ -45,13 +48,15 @@ await navigator.mediaDevices.getUserMedia();
 The Conversation can be initialized with certain options. Those are all optional.
 
 ```tsx
-const conversation = useConversation({/* options object */});
+const conversation = useConversation({
+  /* options object */
+});
 ```
 
-* **onConnect** - handler called when the conversation websocket connection is established.  
-* **onDisconnect** - handler called when the conversation websocket connection is ended.
-* **onMessage** - handler called when a new message is received. These can be tentative or final transcriptions of user voice, replies produced by LLM, or debug message when a debug option is enabled.
-* **onError** - handler called when a error is encountered.
+- **onConnect** - handler called when the conversation websocket connection is established.
+- **onDisconnect** - handler called when the conversation websocket connection is ended.
+- **onMessage** - handler called when a new message is received. These can be tentative or final transcriptions of user voice, replies produced by LLM, or debug message when a debug option is enabled.
+- **onError** - handler called when a error is encountered.
 
 #### Methods
 
@@ -68,7 +73,7 @@ const conversationId = await conversation.startSession({ url });
 ```
 
 For the public agents, define `agentId` - no signed link generation necessary.
- 
+
 In case the conversation requires authorization, use the REST API to generate signed links. Use the signed link as a `url` parameter.
 
 `startSession` returns promise resolving to `conversationId`. The value is a globally unique conversation ID you can use to identify separate conversations.
@@ -76,18 +81,18 @@ In case the conversation requires authorization, use the REST API to generate si
 ```js
 // your server
 const requestHeaders: HeadersInit = new Headers();
-requestHeaders.set("xi-api-key", process.env.XI_API_KEY); // use your ElevenLabs API key 
+requestHeaders.set("xi-api-key", process.env.XI_API_KEY); // use your ElevenLabs API key
 
 const response = await fetch(
-    "https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id={{agent id created through ElevenLabs UI}}",
-    {
-      method: "GET",
-      headers: requestHeaders,
-    }
+  "https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id={{agent id created through ElevenLabs UI}}",
+  {
+    method: "GET",
+    headers: requestHeaders,
+  }
 );
 
 if (!response.ok) {
-    return Response.error();
+  return Response.error();
 }
 
 const body = await response.json();
@@ -112,7 +117,7 @@ await conversation.setVolume({ volume: 0.5 });
 
 ##### status
 
-A React state containing the current status of the conversation. 
+A React state containing the current status of the conversation.
 
 ```js
 const { status } = useConversation();
@@ -121,8 +126,8 @@ console.log(status); // "connected" or "disconnected"
 
 ##### isSpeaking
 
-A React state containing the information of whether the agent is currently speaking. 
-This is helpful for indicating the mode in your UI. 
+A React state containing the information of whether the agent is currently speaking.
+This is helpful for indicating the mode in your UI.
 
 ```js
 const { isSpeaking } = useConversation();

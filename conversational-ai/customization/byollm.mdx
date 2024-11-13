@@ -1,24 +1,26 @@
 ---
-title: "Custom LLM Integration" 
+title: "Custom LLM Integration"
 description: "Guide for using your own LLM or server with ElevenLabs SDK."
 icon: "brain-circuit"
 ---
 
 ## Using Your Own OpenAI Key for LLM
+
 To integrate a custom OpenAI key, create a secret containing your OPENAI_API_KEY:
-<Steps> 
-<Step>
-Navigate to the "Secrets" page and select "Add Secret"
-<img height="200" src="/developer-guides/images/byollm_1.png" />
-</Step>
-<Step>
-Choose "Custom LLM" from the dropdown menu.
-<img height="200" src="/developer-guides/images/byollm_2.png" />
-</Step>
-<Step>
-Enter the URL, your model, and the secret you created.
-<img height="200" src="/developer-guides/images/byollm_3.png" />
-</Step>
+
+<Steps>
+  <Step>
+    Navigate to the "Secrets" page and select "Add Secret"
+    <img height="200" src="/developer-guides/images/byollm_1.png" />
+  </Step>
+  <Step>
+    Choose "Custom LLM" from the dropdown menu.
+    <img height="200" src="/developer-guides/images/byollm_2.png" />
+  </Step>
+  <Step>
+    Enter the URL, your model, and the secret you created.
+    <img height="200" src="/developer-guides/images/byollm_3.png" />
+  </Step>
 </Steps>
 
 ## Custom LLM Server
@@ -26,6 +28,7 @@ Enter the URL, your model, and the secret you created.
 To bring a custom LLM server, set up a compatible server endpoint using OpenAI's style, specifically targeting create_chat_completion.
 
 Here's an example server implementation using FastAPI and OpenAI's Python SDK:
+
 ```python
 python
 import json
@@ -86,9 +89,11 @@ if __name__ == "__main__":
 ```
 
 Run this code or your own server code.
+
 <img height="200" src="/developer-guides/images/byollm_4.png" />
 
 ### Setting Up a Public URL for Your Server
+
 To make your server accessible, create a public URL using a tunneling tool like ngrok:
 
 ```shell
@@ -98,6 +103,7 @@ ngrok http --url=<Your url>.ngrok.app 8013
 <img height="200" src="/developer-guides/images/byollm_5.png" />
 
 ### Configuring Elevenlabs CustomLLM
+
 Now let's make the changes in Elevenlabs
 
 <img height="200" src="/developer-guides/images/byollm_6.png" />

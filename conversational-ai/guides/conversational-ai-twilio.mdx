@@ -1,29 +1,36 @@
 ---
-title: "Conversational AI Twilio Integration" 
+title: "Twilio Integration"
 description: "Guide for integrating Twilio Voice with Conversational AI."
 icon: "phone"
 ---
 
 ## Overview
-This guide explains how to set up a voice call integration between Twilio and Conversational AI. 
+
+This guide explains how to set up a voice call integration between Twilio and Conversational AI.
 The integration allows you to handle incoming phone calls and connect Conversational AI agent to phone calls directly.
 
 ## Prerequisites
+
 - ElevenLabs API key
 - Twilio account & phone number
 - Python 3.7+
 - ngrok for local development
 
 ## Elevenlabs Agent Configurations
+
 We need to make sure audio encoding for Output and Input is set to "μ-law 8000 Hz". This is the audio encoding needed for
 Twilio Voice API, default audio encoding is PCM 16000 Hz
 
 ### Set TTS Output Format
+
 Navigate to your agent -> Go to Voice Section -> Select "μ-law 8000 Hz"
+
 <img height="200" src="/developer-guides/images/twilio_3.png" />
 
 ### Set Input Audio Format
+
 Navigate to your agent -> Go to Advanced Section -> Select "μ-law 8000 Hz"
+
 <img height="200" src="/developer-guides/images/twilio_4.png" />
 
 ## Project Setup
@@ -35,6 +42,7 @@ First, install the required dependencies:
 ```shell
 pip install fastapi uvicorn python-dotenv twilio elevenlabs websockets
 ```
+
 </Step>
 
 <Step>
@@ -44,6 +52,7 @@ Set up your environment variables by creating a `.env` file:
 ELEVENLABS_API_KEY=your_elevenlabs_api_key
 AGENT_ID=your_agent_id
 ```
+
 </Step>
 
 <Step>
@@ -84,7 +93,7 @@ async def handle_incoming_call(request: Request):
     connect.stream(
         url=f"wss://{host}/media-stream-eleven",
     )
-    
+
     response.append(connect)
     return HTMLResponse(content=str(response), media_type="application/xml")
 
@@ -133,6 +142,7 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
+
 </Step>
 
 <Step>
@@ -231,6 +241,7 @@ class TwilioAudioInterface(AudioInterface):
         except Exception as e:
             print(f"Error in input_callback: {e}")
 ```
+
 </Step>
 </Steps>
 
@@ -245,12 +256,9 @@ python main.py
 </Step>
 
 <Step>
-Create a public URL using ngrok:
-```shell
-ngrok http 8003
-```
-Note down the HTTPS URL provided by ngrok (e.g., https://your-ngrok-url.ngrok.app)
-<img height="200" src="/developer-guides/images/twilio_1.png" />
+  Create a public URL using ngrok: ```shell ngrok http 8003 ``` Note down the
+  HTTPS URL provided by ngrok (e.g., https://your-ngrok-url.ngrok.app)
+  <img height="200" src="/developer-guides/images/twilio_1.png" />
 </Step>
 
 <Step>
@@ -279,10 +287,12 @@ Configure your Twilio phone number:
 ### Common Issues
 
 1. **WebSocket Connection Fails**
+
    - Verify your ngrok URL is correct in the Twilio webhook settings
    - Check that your server is running and accessible
 
 2. **No Audio Output**
+
    - Ensure your ElevenLabs API key is correct
    - Verify the AGENT_ID is properly configured
 
@@ -306,4 +316,3 @@ logging.basicConfig(level=logging.DEBUG)
 3. Use HTTPS for all communications
 4. Regularly rotate API keys
 5. Monitor usage to prevent abuse
-
