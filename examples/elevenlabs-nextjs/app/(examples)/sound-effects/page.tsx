@@ -13,10 +13,17 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
-export default function Page() {
+import { createSoundEffect } from '@/app/actions/create-sound-effect';
+import { ApiLogProvider } from './api-log-context';
+import { SoundEffectApiLog } from '@/components/sound-effect-api-log';
+
+function PageContent() {
   const [soundEffects, setSoundEffects] = useState<SoundEffect[]>([]);
   const [selectedEffect, setSelectedEffect] = useState<SoundEffect | null>(null);
   const [autoplay, setAutoplay] = useState(true);
+  const [inputText, setInputText] = useState('');
+  // Track resubmit counts per effect
+  const [resubmitCounts, setResubmitCounts] = useState<Record<string, number>>({});
 
   const handlePendingSoundEffect = (prompt: string) => {
     const pendingEffect: SoundEffect = {
@@ -41,6 +48,7 @@ export default function Page() {
   };
 
   return (
+    <ApiLogProvider>
     <div>
       <div className="container mx-auto">
         <div className="grid h-[600px] grid-cols-[1fr_auto_300px]">
@@ -98,11 +106,53 @@ export default function Page() {
                         <span>Generating...</span>
                       </div>
                     ) : (
-                      <p className="text-muted-foreground text-xs">
-                        {formatDistanceToNow(effect.createdAt, {
-                          addSuffix: true,
-                        })}
-                      </p>
+                      <>
+                        <p className="text-muted-foreground text-xs">
+                          {formatDistanceToNow(effect.createdAt, {
+                            addSuffix: true,
+                          })}
+                        </p>
+                        <div className="flex gap-2 mt-1">
+                          <button
+                            type="button"
+                            className="text-muted-foreground text-xs font-bold px-2 py-1 rounded transition-colors cursor-pointer hover:text-orange-500 hover:bg-accent"
+                            style={{ minWidth: 0 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInputText(effect.prompt);
+                            }}
+                          >
+                            reuse
+                          </button>
+                          <button
+                            type="button"
+                            className="text-muted-foreground text-xs font-bold px-2 py-1 rounded transition-colors cursor-pointer hover:text-orange-500 hover:bg-accent"
+                            style={{ minWidth: 0 }}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              // Increment the retry count for this effect
+                              setResubmitCounts((prev) => ({
+                                ...prev,
+                                [effect.id]: (prev[effect.id] || 0) + 1,
+                              }));
+                              const pendingId = handlePendingSoundEffect(effect.prompt);
+                              const result = await createSoundEffect({ text: effect.prompt });
+                              if (result.ok) {
+                                const newEffect = {
+                                  id: pendingId,
+                                  prompt: effect.prompt,
+                                  audioBase64: result.value.audioBase64,
+                                  createdAt: new Date(),
+                                  status: 'complete' as const,
+                                };
+                                updatePendingEffect(pendingId, newEffect);
+                              }
+                            }}
+                          >
+                            {`Resubmit${resubmitCounts[effect.id] ? ` (${resubmitCounts[effect.id]})` : ''}`}
+                          </button>
+                        </div>
+                      </>
                     )}
                   </CardContent>
                 </Card>
@@ -111,17 +161,29 @@ export default function Page() {
           </ScrollArea>
         </div>
       </div>
+      {/* API Log below the main sound effects box */}
+      <div className="mx-auto max-w-4xl mt-4">
+        <SoundEffectApiLog />
+      </div>
       <div className="absolute bottom-0 left-0 right-0 p-4">
         <div className="mx-auto max-w-4xl">
           <SoundEffectPromptBar
             onPendingEffect={handlePendingSoundEffect}
             onUpdatePendingEffect={updatePendingEffect}
+            inputText={inputText}
+            setInputText={setInputText}
           />
         </div>
       </div>
     </div>
+    </ApiLogProvider>
   );
 }
+
+export default function Page() {
+  return <PageContent />;
+}
+
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center gap-4">
     <Image

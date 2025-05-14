@@ -1,9 +1,11 @@
 'use client';
 
+import React from 'react';
 import { BodySoundGenerationV1SoundGenerationPost } from 'elevenlabs/api';
 import { ClockIcon, DiamondIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useApiLog } from '@/app/(examples)/sound-effects/api-log-context';
 
 import { createSoundEffect } from '@/app/actions/create-sound-effect';
 import { PromptBar, PromptControlsProps } from '@/components/prompt-bar/base';
@@ -23,17 +25,32 @@ import { SoundEffectInput as SoundEffectInputType, soundEffectSchema } from '@/l
 export type SoundEffectPromptProps = {
   onPendingEffect: (prompt: string) => string;
   onUpdatePendingEffect: (id: string, effect: SoundEffect) => void;
+  inputText: string;
+  setInputText: (val: string) => void;
 };
 
 export function SoundEffectPromptBar({
   onPendingEffect,
   onUpdatePendingEffect,
+  inputText,
+  setInputText,
 }: SoundEffectPromptProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { addEntry } = useApiLog();
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Reset retry count when inputText changes
+  React.useEffect(() => {
+    setRetryCount(0);
+  }, [inputText]);
 
   const handleSubmit = async (data: SoundEffectInputType) => {
+    setRetryCount((count) => count + 1);
     try {
-      setIsGenerating(true);
+      addEntry({
+        timestamp: new Date().toLocaleTimeString(),
+        level: 'info',
+        message: `Generating sound effect for: "${data.text}"`
+      });
 
       const pendingId = onPendingEffect(data.text);
 
@@ -50,6 +67,11 @@ export function SoundEffectPromptBar({
       const result = await createSoundEffect(request);
 
       if (result.ok) {
+        addEntry({
+          timestamp: new Date().toLocaleTimeString(),
+          level: 'info',
+          message: `Sound effect generated successfully.`
+        });
         const effect: SoundEffect = {
           id: pendingId,
           prompt: data.text,
@@ -59,14 +81,67 @@ export function SoundEffectPromptBar({
         };
         onUpdatePendingEffect(pendingId, effect);
         toast.success('Generated sound effect');
+        // --- BOUNCE LOGIC ---
+        // Use the filePath returned from createSoundEffect
+        const filePath = result.value.filePath;
+        addEntry({
+          timestamp: new Date().toLocaleTimeString(),
+          level: 'info',
+          message: `Calling bounce-wav for: ${filePath}`
+        });
+        try {
+          fetch('/api/bounce-wav', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filePath }),
+          })
+            .then(async (res) => {
+              const data = await res.json();
+              if (res.ok) {
+                addEntry({
+                  timestamp: new Date().toLocaleTimeString(),
+                  level: 'info',
+                  message: `Bounce success: ${data.bouncedFilePath}`
+                });
+              } else {
+                addEntry({
+                  timestamp: new Date().toLocaleTimeString(),
+                  level: 'error',
+                  message: `Bounce failed: ${data.error}`
+                });
+              }
+            })
+            .catch((err) => {
+              addEntry({
+                timestamp: new Date().toLocaleTimeString(),
+                level: 'error',
+                message: `Bounce error: ${err}`
+              });
+            });
+        } catch (err) {
+          addEntry({
+            timestamp: new Date().toLocaleTimeString(),
+            level: 'error',
+            message: `Bounce error: ${err}`
+          });
+        }
+        // --- END BOUNCE LOGIC ---
         return;
       } else {
+        addEntry({
+          timestamp: new Date().toLocaleTimeString(),
+          level: 'error',
+          message: `Sound effect generation failed: ${result.error}`
+        });
         toast.error(result.error);
       }
     } catch (err) {
+      addEntry({
+        timestamp: new Date().toLocaleTimeString(),
+        level: 'error',
+        message: `Unexpected error: ${err}`
+      });
       toast.error(`An unexpected error occurred: ${err}`);
-    } finally {
-      setIsGenerating(false);
     }
   };
 
@@ -165,6 +240,18 @@ export function SoundEffectPromptBar({
     );
   };
 
+  // Custom right control for Resubmit button with retry counter
+  const renderRightControls = () => (
+    <Button
+      type="submit"
+      size="sm"
+      variant="secondary"
+      className="ml-2"
+    >
+      Resubmit{retryCount > 0 ? ` (${retryCount})` : ''}
+    </Button>
+  );
+
   return (
     <PromptBar
       schema={soundEffectSchema}
@@ -177,8 +264,11 @@ export function SoundEffectPromptBar({
       placeholder="Describe your sound effect..."
       submitTooltip="Create sound effect"
       leftControls={renderLeftControls}
+      rightControls={renderRightControls}
       onSubmit={handleSubmit}
-      isLoading={isGenerating}
+      // isLoading removed to allow multiple generations at once
+      inputValue={inputText}
+      setInputValue={setInputText}
     />
   );
 }

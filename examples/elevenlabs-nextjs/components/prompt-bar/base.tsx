@@ -1,5 +1,7 @@
 'use client';
 
+import React from 'react';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowUpIcon, Loader2Icon } from 'lucide-react';
 import { ReactNode, useState } from 'react';
@@ -42,6 +44,10 @@ export type PromptBarProps<T extends z.ZodType> = {
   onReset?: () => void;
   /** Indicate if submission is in progress from parent component */
   isLoading?: boolean;
+  /** (Optional) Controlled value for the prompt input */
+  inputValue?: string;
+  /** (Optional) Controlled setter for the prompt input */
+  setInputValue?: (val: string) => void;
 };
 
 export function PromptBar<T extends z.ZodType>({
@@ -57,6 +63,8 @@ export function PromptBar<T extends z.ZodType>({
   onSubmit,
   onReset,
   isLoading,
+  inputValue,
+  setInputValue,
 }: PromptBarProps<T>) {
   const form = useForm<z.infer<T>>({
     resolver: zodResolver(schema),
@@ -66,6 +74,17 @@ export function PromptBar<T extends z.ZodType>({
 
   // Make sure the primary field is being watched to detect changes
   const promptValue = form.watch(promptFieldName as Path<z.infer<T>>);
+
+  // If controlled, sync form value with inputValue
+  React.useEffect(() => {
+    if (typeof inputValue === 'string' && promptValue !== inputValue) {
+      form.setValue(promptFieldName as Path<z.infer<T>>, inputValue as any, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputValue]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isProcessing = isLoading !== undefined ? isLoading : isSubmitting;
