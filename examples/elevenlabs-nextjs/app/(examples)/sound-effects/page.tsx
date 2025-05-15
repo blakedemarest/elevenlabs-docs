@@ -234,19 +234,80 @@ function PageContentWithLog() {
         </div>
       </div>
       {/* API Log below the main sound effects box */}
-      <div className="mx-auto max-w-4xl mt-4">
-        <SoundEffectApiLog />
+      <div className="flex mx-auto max-w-6xl gap-6 mt-4">
+      {/* Left Column: Sound Effects + API Log */}
+      <div className="flex-1 min-w-0 flex flex-col gap-4">
+        {/* Sound Effects main card (already present above) */}
+        {/* API Log Card */}
+        <Card className="bg-card text-card-foreground border-card border shadow-lg">
+          <div className="p-4 pb-2 border-b border-border">
+            <h2 className="font-semibold">Sound Effect API Log</h2>
+          </div>
+          <div className="p-4">
+            <SoundEffectApiLog />
+          </div>
+        </Card>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 p-4">
-        <div className="mx-auto max-w-4xl">
-          <SoundEffectPromptBar
-            onPendingEffect={handlePendingSoundEffect}
-            onUpdatePendingEffect={updatePendingEffect}
-            inputText={inputText}
-            setInputText={setInputText}
-          />
-        </div>
+      {/* Right Column: Generations + Prompt History */}
+      <div className="w-80 flex flex-col gap-4">
+        {/* Generations card is already rendered above (do not duplicate) */}
+        {/* Prompt History Panel */}
+        <Card className="h-[300px] bg-card text-card-foreground border-card border shadow-lg flex flex-col">
+          <div className="p-4 pb-2 border-b border-border">
+            <h2 className="font-semibold">Prompt History</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 pt-2">
+            {soundEffects.length === 0 ? (
+              <div className="text-muted-foreground text-sm">No prompts yet.</div>
+            ) : (
+              soundEffects.map((effect) => (
+                <Card
+                  key={effect.id}
+                  className={cn(
+                    'mb-3 p-3 rounded transition-colors cursor-pointer border border-transparent hover:border-accent',
+                    selectedEffect?.id === effect.id && 'border-accent bg-accent',
+                    effect.status === 'loading' && 'cursor-not-allowed opacity-70 hover:bg-transparent'
+                  )}
+                  onClick={() => setSelectedEffect(effect)}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-xs truncate max-w-[120px]">{effect.prompt.slice(0, 32)}{effect.prompt.length > 32 ? '...' : ''}</span>
+                    <span className="text-muted-foreground text-[10px]">{formatDistanceToNow(effect.createdAt, { addSuffix: true })}</span>
+                  </div>
+                  <div className="text-muted-foreground text-xs mb-1 truncate max-w-[180px]">
+                    {effect.prompt}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <button
+                      type="button"
+                      className="text-muted-foreground text-xs font-bold px-2 py-1 rounded transition-colors cursor-pointer hover:text-orange-500 hover:bg-accent"
+                      style={{ minWidth: 0 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInputText(effect.prompt);
+                      }}
+                    >
+                      reuse
+                    </button>
+                    <ResubmitButton effect={effect} handlePendingSoundEffect={handlePendingSoundEffect} updatePendingEffect={updatePendingEffect} setResubmitCounts={setResubmitCounts} resubmitCounts={resubmitCounts} addEntry={addEntry} />
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </Card>
       </div>
+    </div>
+    <div className="absolute bottom-0 left-0 right-0 p-4">
+      <div className="mx-auto max-w-4xl">
+        <SoundEffectPromptBar
+          onPendingEffect={handlePendingSoundEffect}
+          onUpdatePendingEffect={updatePendingEffect}
+          inputText={inputText}
+          setInputText={setInputText}
+        />
+      </div>
+    </div>
     </div>
     </ApiLogProvider>
   );
