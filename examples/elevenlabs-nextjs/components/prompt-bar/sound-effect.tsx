@@ -22,9 +22,19 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { SoundEffectInput as SoundEffectInputType, soundEffectSchema } from '@/lib/schemas';
 
+export type SoundEffectWithParams = {
+  id: string;
+  prompt: string;
+  audioBase64: string;
+  createdAt: Date;
+  status: 'loading' | 'complete';
+  duration_seconds: number | 'auto';
+  prompt_influence: number;
+};
+
 export type SoundEffectPromptProps = {
-  onPendingEffect: (prompt: string) => string;
-  onUpdatePendingEffect: (id: string, effect: SoundEffect) => void;
+  onPendingEffect: (prompt: string, duration_seconds: number | 'auto', prompt_influence: number) => string;
+  onUpdatePendingEffect: (id: string, effect: SoundEffectWithParams) => void;
   inputText: string;
   setInputText: (val: string) => void;
 };
@@ -52,7 +62,7 @@ export function SoundEffectPromptBar({
         message: `Generating sound effect for: "${data.text}"`
       });
 
-      const pendingId = onPendingEffect(data.text);
+      const pendingId = onPendingEffect(data.text, data.duration_seconds, data.prompt_influence);
 
       const request: BodySoundGenerationV1SoundGenerationPost = {
         text: data.text,
@@ -72,12 +82,14 @@ export function SoundEffectPromptBar({
           level: 'info',
           message: `Sound effect generated successfully.`
         });
-        const effect: SoundEffect = {
+        const effect: SoundEffectWithParams = {
           id: pendingId,
           prompt: data.text,
           audioBase64: result.value.audioBase64,
           createdAt: new Date(),
           status: 'complete',
+          duration_seconds: data.duration_seconds,
+          prompt_influence: data.prompt_influence,
         };
         onUpdatePendingEffect(pendingId, effect);
         toast.success('Generated sound effect');
@@ -240,7 +252,6 @@ export function SoundEffectPromptBar({
     );
   };
 
-  // Custom right control for Resubmit button with retry counter
   const renderRightControls = () => (
     <Button
       type="submit"
@@ -248,7 +259,7 @@ export function SoundEffectPromptBar({
       variant="secondary"
       className="ml-2"
     >
-      Resubmit{retryCount > 0 ? ` (${retryCount})` : ''}
+      Submit
     </Button>
   );
 
@@ -266,16 +277,10 @@ export function SoundEffectPromptBar({
       leftControls={renderLeftControls}
       rightControls={renderRightControls}
       onSubmit={handleSubmit}
-      // isLoading removed to allow multiple generations at once
       inputValue={inputText}
       setInputValue={setInputText}
     />
   );
-}
-export type SoundEffect = {
-  id: string;
-  prompt: string;
-  audioBase64: string;
-  createdAt: Date;
-  status: 'loading' | 'complete';
 };
+
+export default SoundEffectPromptBar;

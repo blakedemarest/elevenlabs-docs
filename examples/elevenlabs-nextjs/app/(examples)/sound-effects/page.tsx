@@ -6,7 +6,18 @@ import Image from 'next/image';
 import { useState } from 'react';
 
 import { AudioPlayer } from '@/app/(examples)/text-to-speech/components/audio-player';
-import { SoundEffectPromptBar, type SoundEffect } from '@/components/prompt-bar/sound-effect';
+import { SoundEffectPromptBar } from '@/components/prompt-bar/sound-effect';
+
+// Extend SoundEffect type locally to include params
+export type SoundEffectWithParams = {
+  id: string;
+  prompt: string;
+  audioBase64: string;
+  createdAt: Date;
+  status: 'loading' | 'complete';
+  duration_seconds: number | 'auto';
+  prompt_influence: number;
+};
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -14,35 +25,128 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 import { createSoundEffect } from '@/app/actions/create-sound-effect';
-import { ApiLogProvider } from './api-log-context';
+import { ApiLogProvider, useApiLog } from './api-log-context';
 import { SoundEffectApiLog } from '@/components/sound-effect-api-log';
 
+// --- ResubmitButton Component ---
+function ResubmitButton({ effect, handlePendingSoundEffect, updatePendingEffect, setResubmitCounts, resubmitCounts, addEntry }: any) {
+  return (
+    <button
+      type="button"
+      className="text-muted-foreground text-xs font-bold px-2 py-1 rounded transition-colors cursor-pointer hover:text-orange-500 hover:bg-accent"
+      style={{ minWidth: 0 }}
+      onClick={async (e) => {
+        e.stopPropagation();
+        setResubmitCounts((prev: any) => ({
+          ...prev,
+          [effect.id]: (prev[effect.id] || 0) + 1,
+        }));
+        addEntry({
+          timestamp: new Date().toLocaleTimeString(),
+          level: 'info',
+          message: `[RESUBMIT] Attempting with prompt: "${effect.prompt}", duration_seconds: ${effect.duration_seconds}, prompt_influence: ${effect.prompt_influence}`,
+        });
+        const pendingId = handlePendingSoundEffect(
+          effect.prompt,
+          effect.duration_seconds,
+          effect.prompt_influence
+        );
+        const request: any = {
+          text: effect.prompt,
+          prompt_influence: effect.prompt_influence,
+        };
+        if (effect.duration_seconds !== 'auto') {
+          request.duration_seconds = effect.duration_seconds;
+        }
+        addEntry({
+          timestamp: new Date().toLocaleTimeString(),
+          level: 'info',
+          message: `[RESUBMIT] Sending request to createSoundEffect: ${JSON.stringify(request)}`,
+        });
+        const result = await createSoundEffect(request);
+        addEntry({
+          timestamp: new Date().toLocaleTimeString(),
+          level: result.ok ? 'info' : 'error',
+          message: `[RESUBMIT] createSoundEffect result: ${result.ok ? 'success' : 'error'}${result.ok ? '' : ` - ${result.error}`}`,
+        });
+        if (result.ok) {
+          const newEffect: SoundEffectWithParams = {
+            id: pendingId,
+            prompt: effect.prompt,
+            audioBase64: result.value.audioBase64,
+            createdAt: new Date(),
+            status: 'complete' as const,
+            duration_seconds: effect.duration_seconds,
+            prompt_influence: effect.prompt_influence,
+          };
+          updatePendingEffect(pendingId, newEffect);
+          // --- BOUNCE LOGIC ---
+          const filePath = result.value.filePath;
+          if (filePath) {
+            fetch('/api/bounce-wav', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filePath }),
+            })
+              .then(async (res) => {
+                const data = await res.json();
+                if (res.ok) {
+                  console.log(`[BOUNCE] Success: ${data.bouncedFilePath}`);
+                } else {
+                  console.error(`[BOUNCE] Failed: ${data.error}`);
+                }
+              })
+              .catch((err) => {
+                console.error(`[BOUNCE] Error:`, err);
+              });
+          }
+        }
+      }}
+    >
+      {`Resubmit${resubmitCounts[effect.id] ? ` (${resubmitCounts[effect.id]})` : ''}`}
+    </button>
+  );
+}
+
 function PageContent() {
-  const [soundEffects, setSoundEffects] = useState<SoundEffect[]>([]);
-  const [selectedEffect, setSelectedEffect] = useState<SoundEffect | null>(null);
+  // Move all logic that needs addEntry into a child component wrapped by ApiLogProvider
+  return (
+    <ApiLogProvider>
+      <PageContentWithLog />
+    </ApiLogProvider>
+  );
+}
+
+function PageContentWithLog() {
+  const { addEntry } = useApiLog();
+  const [soundEffects, setSoundEffects] = useState<SoundEffectWithParams[]>([]);
+  const [selectedEffect, setSelectedEffect] = useState<SoundEffectWithParams | null>(null);
   const [autoplay, setAutoplay] = useState(true);
   const [inputText, setInputText] = useState('');
   // Track resubmit counts per effect
   const [resubmitCounts, setResubmitCounts] = useState<Record<string, number>>({});
 
-  const handlePendingSoundEffect = (prompt: string) => {
-    const pendingEffect: SoundEffect = {
+  // Accept params for pending effect
+  const handlePendingSoundEffect = (prompt: string, duration_seconds: number | 'auto', prompt_influence: number) => {
+    const pendingEffect: SoundEffectWithParams = {
       id: nanoid(),
       prompt,
       audioBase64: '',
       createdAt: new Date(),
       status: 'loading',
+      duration_seconds,
+      prompt_influence,
     };
     setSoundEffects((prev) => [pendingEffect, ...prev]);
     setSelectedEffect(pendingEffect);
     return pendingEffect.id;
   };
 
-  const updatePendingEffect = (id: string, effect: SoundEffect) => {
+  const updatePendingEffect = (id: string, effect: SoundEffectWithParams) => {
     setSoundEffects((prev) =>
       prev.map((item) => (item.id === id ? { ...effect, status: 'complete' as const } : item))
     );
-    setSelectedEffect((current) =>
+    setSelectedEffect((current: SoundEffectWithParams | null) =>
       current?.id === id ? { ...effect, status: 'complete' as const } : current
     );
   };
@@ -96,61 +200,29 @@ function PageContent() {
                     effect.status === 'loading' &&
                       'cursor-not-allowed opacity-70 hover:bg-transparent'
                   )}
-                  onClick={() => effect.status === 'complete' && setSelectedEffect(effect)}
+                  onClick={() => setSelectedEffect(effect)}
                 >
-                  <CardContent className="px-3 py-3">
-                    <p className="mb-1 max-w-[250px] truncate font-medium">{effect.prompt}</p>
-                    {effect.status === 'loading' ? (
-                      <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                        <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-current" />
-                        <span>Generating...</span>
-                      </div>
-                    ) : (
+                  <CardContent className="flex flex-col gap-1.5 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-sm truncate max-w-[180px]">{effect.prompt}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {formatDistanceToNow(effect.createdAt, { addSuffix: true })}
+                      </span>
+                    </div>
+                    {effect.status === 'complete' && (
                       <>
-                        <p className="text-muted-foreground text-xs">
-                          {formatDistanceToNow(effect.createdAt, {
-                            addSuffix: true,
-                          })}
-                        </p>
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-2">
                           <button
                             type="button"
-                            className="text-muted-foreground text-xs font-bold px-2 py-1 rounded transition-colors cursor-pointer hover:text-orange-500 hover:bg-accent"
+                            className="text-muted-foreground text-xs px-2 py-1 rounded transition-colors cursor-pointer hover:text-blue-500 hover:bg-accent"
                             style={{ minWidth: 0 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            onClick={() => {
                               setInputText(effect.prompt);
                             }}
                           >
                             reuse
                           </button>
-                          <button
-                            type="button"
-                            className="text-muted-foreground text-xs font-bold px-2 py-1 rounded transition-colors cursor-pointer hover:text-orange-500 hover:bg-accent"
-                            style={{ minWidth: 0 }}
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              // Increment the retry count for this effect
-                              setResubmitCounts((prev) => ({
-                                ...prev,
-                                [effect.id]: (prev[effect.id] || 0) + 1,
-                              }));
-                              const pendingId = handlePendingSoundEffect(effect.prompt);
-                              const result = await createSoundEffect({ text: effect.prompt });
-                              if (result.ok) {
-                                const newEffect = {
-                                  id: pendingId,
-                                  prompt: effect.prompt,
-                                  audioBase64: result.value.audioBase64,
-                                  createdAt: new Date(),
-                                  status: 'complete' as const,
-                                };
-                                updatePendingEffect(pendingId, newEffect);
-                              }
-                            }}
-                          >
-                            {`Resubmit${resubmitCounts[effect.id] ? ` (${resubmitCounts[effect.id]})` : ''}`}
-                          </button>
+                          <ResubmitButton effect={effect} handlePendingSoundEffect={handlePendingSoundEffect} updatePendingEffect={updatePendingEffect} setResubmitCounts={setResubmitCounts} resubmitCounts={resubmitCounts} addEntry={addEntry} />
                         </div>
                       </>
                     )}
