@@ -10,7 +10,7 @@ import path from 'path';
 
 export async function createSoundEffect(
   request: BodySoundGenerationV1SoundGenerationPost
-): Promise<Result<{ audioBase64: string; processingTimeMs: number }>> {
+): Promise<Result<{ audioBase64: string; processingTimeMs: number; filePath?: string }>> {
   const startTime = performance.now();
   const clientResult = await getElevenLabsClient();
   if (!clientResult.ok) return Err(clientResult.error);
@@ -64,6 +64,7 @@ export async function createSoundEffect(
     return Ok({
       audioBase64: `data:audio/wav;base64,${audioBase64}`,
       processingTimeMs,
+      filePath: undefined,
     });
   } catch (error) {
     return handleError(error, 'sound effect generation');

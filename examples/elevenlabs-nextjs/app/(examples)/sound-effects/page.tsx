@@ -214,7 +214,7 @@ function PageContentWithLog() {
                         <div className="flex items-center gap-2 mt-2">
                           <button
                             type="button"
-                            className="text-muted-foreground text-xs px-2 py-1 rounded transition-colors cursor-pointer hover:text-blue-500 hover:bg-accent"
+                            className="text-muted-foreground text-xs font-bold px-2 py-1 rounded transition-colors cursor-pointer hover:text-orange-500 hover:bg-accent"
                             style={{ minWidth: 0 }}
                             onClick={() => {
                               setInputText(effect.prompt);

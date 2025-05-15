@@ -1,5 +1,3 @@
-![LOGO](https://github.com/elevenlabs/elevenlabs-python/assets/12028621/21267d89-5e82-4e7e-9c81-caf30b237683)
-
 # ElevenLabs DX
 
 This repo contains the source for the ElevenLabs documentation site, the [Next.js example app](./examples/elevenlabs-nextjs/) and the SDK generation.
@@ -83,3 +81,26 @@ To view the changes locally run
 fern generate --group python-sdk --preview
 # `fern write-definition` shows you the intermediate step
 ```
+---
+
+## Customizations & Change Log
+
+This section documents all significant changes and enhancements made to the ElevenLabs Next.js example and supporting files in this repo:
+
+### Sound Effects App & Next.js Example
+- **Audio Output Directory:** All generated sound effects (WAV files) are automatically saved to `D:/ELEVENLABSOUTPUTWAVS` with filenames formatted as `YYYY-MM-DD-prompt_input-timestamp.wav`.
+- **Improved Logging:** Added a real-time API log panel to the UI, capturing all sound effect generation and bounce actions, including errors and parameters.
+- **Resubmit Functionality:** Added the ability to resubmit sound effect generations with the same parameters, and log each resubmission attempt in detail.
+- **UI Simplification:** Removed confusing "Resubmit" button and retry counter from the prompt bar; only a single "Submit" button is now shown.
+- **Bounce Logic:** Integrated logic to call a `/api/bounce-wav` endpoint after each successful sound effect generation, archiving bounced files.
+- **Type Safety:** Extended types (e.g., `SoundEffectWithParams`) to ensure all relevant parameters are tracked for every sound effect and resubmission.
+- **Batch Dev Script:** Added `run-dev.bat` for easy local development startup.
+
+### Project Setup & Best Practices
+- **.env Configuration:** Example `.env` file provided for API keys and session secrets.
+- **SDK & Docs:** Refer to [elevenlabs.io/docs](https://elevenlabs.io/docs) and the repo's `fern` folder for SDK generation and documentation customization.
+- **UI/UX:** Uses Tailwind CSS and shadcn/ui for a modern, accessible interface.
+
+---
+
+*For more details on any change, see inline comments in the relevant files or the commit history.*
