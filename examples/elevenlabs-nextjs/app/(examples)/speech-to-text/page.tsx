@@ -19,10 +19,13 @@ import { Button } from '@/components/ui/button';
 import { STT_MODELS } from '@/lib/schemas';
 
 import { groupWordsBySpeaker } from './lib/transcription-utils';
+import { ApiLogProvider, useApiLog } from './api-log-context';
+import { SpeechToTextApiLog } from '@/components/speech-to-text-api-log';
+import { SpeechToTextPromptHistory, PromptHistoryEntry } from '@/components/speech-to-text-prompt-history';
 
 type ViewState = 'upload' | 'result';
 
-export default function Page() {
+function SpeechToTextPageContent() {
   const [viewState, setViewState] = useState<ViewState>('upload');
   const [audio, setAudio] = useState<{
     file: File | null;
@@ -35,6 +38,8 @@ export default function Page() {
     isPlaying: false,
     currentTime: 0,
   });
+  const [promptHistory, setPromptHistory] = useState<PromptHistoryEntry[]>([]);
+  const { addLog } = useApiLog();
   const [transcription, setTranscription] = useState<{
     data: TranscriptionResult | null;
     wordGroups: WordGroup[];
@@ -94,6 +99,16 @@ export default function Page() {
       return;
     }
 
+    addLog({
+      timestamp: new Date().toLocaleTimeString(),
+      level: 'info',
+      message: `Transcribing audio file: ${audio.file?.name || 'N/A'}`,
+    });
+    setPromptHistory((prev) => [
+      { prompt: audio.file?.name || 'Unknown file', timestamp: new Date().toLocaleTimeString() },
+      ...prev,
+    ]);
+
     setTranscription((prev) => ({ ...prev, isProcessing: true }));
 
     try {
@@ -131,18 +146,33 @@ export default function Page() {
           isProcessing: false,
         });
 
+        addLog({
+          timestamp: new Date().toLocaleTimeString(),
+          level: 'info',
+          message: `Audio transcribed successfully: ${audio.file?.name || 'N/A'}`,
+        });
         toast.success('Audio transcribed successfully');
         setViewState('result');
       } else {
+        addLog({
+          timestamp: new Date().toLocaleTimeString(),
+          level: 'error',
+          message: `Failed to transcribe audio: ${result.error || 'Unknown error'}`,
+        });
         toast.error(result.error || 'Failed to transcribe audio');
         setTranscription((prev) => ({ ...prev, isProcessing: false }));
       }
     } catch (error) {
       console.error('Transcription error:', error);
+      addLog({
+        timestamp: new Date().toLocaleTimeString(),
+        level: 'error',
+        message: `Transcription error: ${error}`,
+      });
       toast.error('An error occurred during transcription');
       setTranscription((prev) => ({ ...prev, isProcessing: false }));
     }
-  }, [audio.file, transcriptionOptions]);
+  }, [audio.file, transcriptionOptions, addLog]);
 
   const resetToUpload = useCallback(() => {
     setViewState('upload');
@@ -268,8 +298,22 @@ export default function Page() {
   );
 
   return (
-    <div className="container mx-auto max-w-5xl py-4">
-      {viewState === 'upload' ? renderUploadView() : renderResultView()}
+    <div className="container mx-auto max-w-5xl py-4 flex flex-row gap-6">
+      <div className="flex-1">
+        {viewState === 'upload' ? renderUploadView() : renderResultView()}
+      </div>
+      <div className="w-80 flex flex-col gap-4">
+        <SpeechToTextApiLog />
+        <SpeechToTextPromptHistory history={promptHistory} />
+      </div>
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <ApiLogProvider>
+      <SpeechToTextPageContent />
+    </ApiLogProvider>
   );
 }

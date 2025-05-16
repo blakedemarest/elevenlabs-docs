@@ -9,7 +9,7 @@ export default function Page() {
       <h1 className="text-xl font-bold">Examples</h1>
 
       <div className="space-y-10">
-        {demos.map((section) => {
+        {demos.filter(section => section.name !== 'Conversational AI').map((section) => {
           return (
             <div key={section.name} className="space-y-5">
               <div className="text-foreground/80 text-xs font-bold uppercase tracking-wider">
@@ -17,7 +17,7 @@ export default function Page() {
               </div>
 
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {section.items.map((item) => {
+                {section.items.filter(item => item.name !== 'Conversational AI').map((item) => {
                   return (
                     <Link href={`/${item.slug}`} key={item.name}>
                       <Card className="border-gradient rounded-lg p-px shadow-lg">

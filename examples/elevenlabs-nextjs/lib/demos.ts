@@ -31,12 +31,6 @@ export const demos: { name: string; items: Demo[] }[] = [
         slug: 'sound-effects',
         description: 'Turn text into cinematic sound effects.',
       },
-      {
-        name: 'Conversational AI',
-        icon: MessagesSquare,
-        slug: 'conversational-ai',
-        description: 'Build life-like conversational agents.',
-      },
     ],
   },
 ];

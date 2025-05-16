@@ -27,11 +27,15 @@ import { TtsInput, ttsSchema, TTS_MODELS } from '@/lib/schemas';
 export type TextToSpeechPromptProps = {
   onGenerateStart: (text: string) => string;
   onGenerateComplete: (id: string, text: string, audioUrl: string) => void;
+  inputText?: string;
+  setInputText?: (val: string) => void;
 };
 
 export function TextToSpeechPromptBar({
   onGenerateStart,
   onGenerateComplete,
+  inputText,
+  setInputText,
 }: TextToSpeechPromptProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -435,6 +439,8 @@ export function TextToSpeechPromptBar({
       rightControls={renderRightControls}
       onSubmit={handleSubmit}
       isLoading={isGenerating || isSpeaking}
+      inputValue={inputText}
+      setInputValue={setInputText}
     />
   );
 }
