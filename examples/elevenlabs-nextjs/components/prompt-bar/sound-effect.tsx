@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BodySoundGenerationV1SoundGenerationPost } from 'elevenlabs/api';
 import { ClockIcon, DiamondIcon } from 'lucide-react';
-import { useState } from 'react';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { useApiLog } from '@/app/(examples)/sound-effects/api-log-context';
 
@@ -47,6 +47,19 @@ export function SoundEffectPromptBar({
 }: SoundEffectPromptProps) {
   const { addEntry } = useApiLog();
   const [retryCount, setRetryCount] = useState(0);
+  // Bulk count state, persisted in localStorage
+  const [bulkCount, setBulkCount] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('bulkCount');
+      return stored ? parseInt(stored, 10) : 1;
+    }
+    return 1;
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('bulkCount', String(bulkCount));
+    }
+  }, [bulkCount]);
 
   // Reset retry count when inputText changes
   React.useEffect(() => {
@@ -55,114 +68,148 @@ export function SoundEffectPromptBar({
 
   const handleSubmit = async (data: SoundEffectInputType) => {
     setRetryCount((count) => count + 1);
-    try {
-      addEntry({
-        timestamp: new Date().toLocaleTimeString(),
-        level: 'info',
-        message: `Generating sound effect for: "${data.text}"`
-      });
-
-      const pendingId = onPendingEffect(data.text, data.duration_seconds, data.prompt_influence);
-
-      const request: BodySoundGenerationV1SoundGenerationPost = {
-        text: data.text,
-        prompt_influence: data.prompt_influence,
-      };
-
-      // Only add duration_seconds if it's a number (not 'auto')
-      if (data.duration_seconds !== 'auto') {
-        request.duration_seconds = data.duration_seconds;
-      }
-
-      const result = await createSoundEffect(request);
-
-      if (result.ok) {
-        addEntry({
-          timestamp: new Date().toLocaleTimeString(),
-          level: 'info',
-          message: `Sound effect generated successfully.`
-        });
-        const effect: SoundEffectWithParams = {
-          id: pendingId,
-          prompt: data.text,
-          audioBase64: result.value.audioBase64,
-          createdAt: new Date(),
-          status: 'complete',
-          duration_seconds: data.duration_seconds,
-          prompt_influence: data.prompt_influence,
-        };
-        onUpdatePendingEffect(pendingId, effect);
-        toast.success('Generated sound effect');
-        // --- BOUNCE LOGIC ---
-        // Use the filePath returned from createSoundEffect
-        const filePath = result.value.filePath;
-        addEntry({
-          timestamp: new Date().toLocaleTimeString(),
-          level: 'info',
-          message: `Calling bounce-wav for: ${filePath}`
-        });
+    const calls = Array.from({ length: bulkCount });
+    await Promise.allSettled(
+      calls.map(async (_, idx) => {
         try {
-          fetch('/api/bounce-wav', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filePath }),
-          })
-            .then(async (res) => {
-              const data = await res.json();
-              if (res.ok) {
-                addEntry({
-                  timestamp: new Date().toLocaleTimeString(),
-                  level: 'info',
-                  message: `Bounce success: ${data.bouncedFilePath}`
+          addEntry({
+            timestamp: new Date().toLocaleTimeString(),
+            level: 'info',
+            message: `Generating sound effect (${idx+1}/${bulkCount}) for: "${data.text}"`
+          });
+
+          const pendingId = onPendingEffect(data.text, data.duration_seconds, data.prompt_influence);
+
+          const request: BodySoundGenerationV1SoundGenerationPost = {
+            text: data.text,
+            prompt_influence: data.prompt_influence,
+          };
+
+          if (data.duration_seconds !== 'auto') {
+            request.duration_seconds = data.duration_seconds;
+          }
+
+          const result = await createSoundEffect(request);
+
+          if (result.ok) {
+            addEntry({
+              timestamp: new Date().toLocaleTimeString(),
+              level: 'info',
+              message: `Sound effect generated successfully.`
+            });
+            const effect: SoundEffectWithParams = {
+              id: pendingId,
+              prompt: data.text,
+              audioBase64: result.value.audioBase64,
+              createdAt: new Date(),
+              status: 'complete',
+              duration_seconds: data.duration_seconds,
+              prompt_influence: data.prompt_influence,
+            };
+            onUpdatePendingEffect(pendingId, effect);
+            toast.success(`Generated sound effect (${idx+1})`);
+
+            // --- BOUNCE LOGIC ---
+            const filePath = result.value.filePath;
+            addEntry({
+              timestamp: new Date().toLocaleTimeString(),
+              level: 'info',
+              message: `Calling bounce-wav for: ${filePath}`
+            });
+            try {
+              fetch('/api/bounce-wav', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filePath }),
+              })
+                .then(async (res) => {
+                  const data = await res.json();
+                  if (res.ok) {
+                    addEntry({
+                      timestamp: new Date().toLocaleTimeString(),
+                      level: 'info',
+                      message: `Bounce success: ${data.bouncedFilePath}`
+                    });
+                  } else {
+                    addEntry({
+                      timestamp: new Date().toLocaleTimeString(),
+                      level: 'error',
+                      message: `Bounce failed: ${data.error}`
+                    });
+                  }
+                })
+                .catch((err) => {
+                  addEntry({
+                    timestamp: new Date().toLocaleTimeString(),
+                    level: 'error',
+                    message: `Bounce error: ${err}`
+                  });
                 });
-              } else {
-                addEntry({
-                  timestamp: new Date().toLocaleTimeString(),
-                  level: 'error',
-                  message: `Bounce failed: ${data.error}`
-                });
-              }
-            })
-            .catch((err) => {
+            } catch (err) {
               addEntry({
                 timestamp: new Date().toLocaleTimeString(),
                 level: 'error',
                 message: `Bounce error: ${err}`
               });
+            }
+            // --- END BOUNCE LOGIC ---
+          } else {
+            addEntry({
+              timestamp: new Date().toLocaleTimeString(),
+              level: 'error',
+              message: `Sound effect generation failed: ${result.error}`
             });
+            toast.error(result.error);
+          }
+          return null;
         } catch (err) {
           addEntry({
             timestamp: new Date().toLocaleTimeString(),
             level: 'error',
-            message: `Bounce error: ${err}`
+            message: `Sound effect generation error: ${err}`
           });
+          toast.error(String(err));
+          return null;
         }
-        // --- END BOUNCE LOGIC ---
-        return;
-      } else {
-        addEntry({
-          timestamp: new Date().toLocaleTimeString(),
-          level: 'error',
-          message: `Sound effect generation failed: ${result.error}`
-        });
-        toast.error(result.error);
-      }
-    } catch (err) {
-      addEntry({
-        timestamp: new Date().toLocaleTimeString(),
-        level: 'error',
-        message: `Unexpected error: ${err}`
-      });
-      toast.error(`An unexpected error occurred: ${err}`);
-    }
+      })
+    );
   };
 
+  // Place these inside the component so they have access to bulkCount/setBulkCount
   const renderLeftControls = ({ form }: PromptControlsProps<SoundEffectInputType>) => {
     const duration = form.watch('duration_seconds');
     const promptInfluence = form.watch('prompt_influence');
-
+    const bulkOptions = [1, 2, 3, 4, 5, 10];
     return (
       <div className="flex flex-wrap gap-1.5">
+        {/* Bulk Button */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="flex h-9 w-9 min-w-[80px] items-center gap-1.5 rounded-full bg-white/10 p-0 hover:bg-white/20"
+            >
+              <span className="mr-2">Bulk{bulkCount > 1 ? `: ${bulkCount}` : ''}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-36 p-2">
+            <div className="flex flex-col gap-1">
+              {bulkOptions.map((n) => (
+                <Button
+                  key={n}
+                  size="sm"
+                  variant={bulkCount === n ? 'default' : 'ghost'}
+                  className="w-full justify-start"
+                  onClick={() => setBulkCount(n)}
+                >
+                  {n} {n === 1 ? 'Single' : 'Parallel'}
+                </Button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        {/* Duration Button */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -210,7 +257,7 @@ export function SoundEffectPromptBar({
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
-
+        {/* Prompt Influence Button */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -262,7 +309,6 @@ export function SoundEffectPromptBar({
       Submit
     </Button>
   );
-
   return (
     <PromptBar
       schema={soundEffectSchema}
@@ -281,6 +327,6 @@ export function SoundEffectPromptBar({
       setInputValue={setInputText}
     />
   );
-};
+}
 
 export default SoundEffectPromptBar;
